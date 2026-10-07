@@ -1,0 +1,21 @@
+modLoader="javafml"
+loaderVersion="[40,)"
+license="MIT"
+[[mods]]
+modId="soundtrackselector"
+version="${fullVersion}"
+displayName="Soundtrack Selector"
+displayTest="IGNORE_ALL_VERSION"
+description="Choose which discovered audio tracks can play as client background music."
+[[dependencies.soundtrackselector]]
+modId="forge"
+mandatory=true
+versionRange="[40.3.12,)"
+ordering="NONE"
+side="CLIENT"
+[[dependencies.soundtrackselector]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.18.2]"
+ordering="NONE"
+side="CLIENT"

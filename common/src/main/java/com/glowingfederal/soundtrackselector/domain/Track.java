@@ -1,0 +1,47 @@
+package com.glowingfederal.soundtrackselector.domain;
+
+import java.util.Locale;
+
+/** A resolved audio resource, independent of a loader's sound-event registry. */
+public final class Track {
+    public final String id;
+    public final String event;
+    public final String namespace;
+    public final String name;
+    public final String searchText;
+    public final double seconds;
+    public final boolean music;
+
+    public Track(String id, String event, double seconds) {
+        this.id = id;
+        this.event = event;
+        this.seconds = seconds;
+        this.music = musicHint(id) || musicHint(event);
+        this.namespace = id.substring(0, id.indexOf(':'));
+        String path = id.substring(id.indexOf(':') + 1).replaceFirst("^(sounds|sound|music|records)/", "")
+                .replaceFirst("\\.ogg$", "");
+        StringBuilder readable = new StringBuilder();
+        for (String word : path.split("[/._-]+")) {
+            if (word.length() == 0) continue;
+            if (readable.length() > 0) readable.append(' ');
+            readable.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        name = readable.toString();
+        searchText = (name + " " + id + " " + event).toLowerCase(Locale.ROOT);
+    }
+
+    public static boolean musicHint(String value) {
+        int colon = value.indexOf(':');
+        if (colon >= 0) value = value.substring(colon + 1);
+        for (String token : value.toLowerCase(Locale.ROOT).split("[:/._-]+"))
+            if (token.equals("music") || token.equals("soundtrack") || token.equals("song")
+                    || token.equals("songs") || token.equals("record") || token.equals("records")
+                    || token.equals("disc") || token.equals("discs")) return true;
+        return false;
+    }
+
+    public String durationText() {
+        int total = (int) seconds;
+        return (total / 60) + ":" + (total % 60 < 10 ? "0" : "") + (total % 60);
+    }
+}

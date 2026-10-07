@@ -1,0 +1,390 @@
+{
+  "mod_id": "soundtrackselector",
+  "base_package": "com.glowingfederal.soundtrackselector",
+  "display_name": "Soundtrack Selector",
+  "archive_pattern": "{mod_id}-{full_version}+mc{mc}-{loader}.jar",
+  "version_class": "{package_path}/BuildVersion.class",
+  "required_classes": [
+    "{package_path}/SoundtrackSelector.class",
+    "{package_path}/ClientAdapter.class",
+    "{package_path}/SelectorScreen.class"
+  ],
+  "required_shared_classes": [
+    "{package_path}/domain/Track.class",
+    "{package_path}/domain/Catalog.class",
+    "{package_path}/domain/Preferences.class",
+    "{package_path}/domain/OggDuration.class",
+    "{package_path}/domain/SoundDefinitions.class",
+    "{package_path}/domain/Library.class",
+    "{package_path}/domain/ListView.class",
+    "{package_path}/domain/FieldAccess.class",
+    "{package_path}/domain/PlayerView.class"
+  ],
+  "class_roots": [
+    "{package_path}/"
+  ],
+  "resource_roots": [
+    "assets/{mod_id}/"
+  ],
+  "required_assets": [],
+  "metadata_profiles": {
+    "legacy": {
+      "path": "mcmod.info",
+      "json_values": {
+        "0.modid": "{mod_id}",
+        "0.name": "{display_name}",
+        "0.version": "{full_version}",
+        "0.mcversion": "{mc}"
+      }
+    },
+    "forge": {
+      "path": "META-INF/mods.toml",
+      "sections": [
+        {
+          "table": "",
+          "fields": {
+            "modLoader": "javafml",
+            "loaderVersion": "{fml_range}"
+          }
+        },
+        {
+          "table": "mods",
+          "fields": {
+            "modId": "{mod_id}",
+            "version": "{full_version}",
+            "displayName": "{display_name}",
+            "displayTest": "IGNORE_ALL_VERSION"
+          }
+        },
+        {
+          "table": "dependencies.{mod_id}",
+          "fields": {
+            "modId": "{loader}",
+            "versionRange": "{loader_range}",
+            "mandatory": true,
+            "side": "CLIENT"
+          }
+        },
+        {
+          "table": "dependencies.{mod_id}",
+          "fields": {
+            "modId": "minecraft",
+            "versionRange": "[{mc}]",
+            "mandatory": true,
+            "side": "CLIENT"
+          }
+        }
+      ]
+    },
+    "neoforge": {
+      "path": "META-INF/neoforge.mods.toml",
+      "sections": [
+        {
+          "table": "",
+          "fields": {
+            "modLoader": "javafml",
+            "loaderVersion": "{fml_range}"
+          }
+        },
+        {
+          "table": "mods",
+          "fields": {
+            "modId": "{mod_id}",
+            "version": "{full_version}",
+            "displayName": "{display_name}"
+          }
+        },
+        {
+          "table": "dependencies.{mod_id}",
+          "fields": {
+            "modId": "{loader}",
+            "versionRange": "{loader_range}",
+            "type": "required",
+            "side": "CLIENT"
+          }
+        },
+        {
+          "table": "dependencies.{mod_id}",
+          "fields": {
+            "modId": "minecraft",
+            "versionRange": "[{mc}]",
+            "type": "required",
+            "side": "CLIENT"
+          }
+        }
+      ]
+    }
+  },
+  "targets": {
+    "1.6.4": {
+      "metadata_profile": "legacy",
+      "block_textures": "blocks",
+      "item_textures": "items",
+      "language_file": "en_US.lang",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.pack_format": 1,
+            "pack.description": "Soundtrack Selector resources"
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "func_110442_L"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "required_assets": [
+        "assets/{mod_id}/lang/en_US.lang",
+        "pack.mcmeta"
+      ]
+    },
+    "1.7.10": {
+      "metadata_profile": "legacy",
+      "block_textures": "blocks",
+      "item_textures": "items",
+      "language_file": "en_US.lang",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.pack_format": 1,
+            "pack.description": "Soundtrack Selector resources"
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "func_110442_L"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "required_assets": [
+        "assets/{mod_id}/lang/en_US.lang",
+        "pack.mcmeta"
+      ]
+    },
+    "1.8.9": {
+      "metadata_profile": "legacy",
+      "block_textures": "blocks",
+      "item_textures": "items",
+      "language_file": "en_US.lang",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.pack_format": 1,
+            "pack.description": "Soundtrack Selector resources"
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "func_110442_L"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "required_assets": [
+        "assets/{mod_id}/lang/en_US.lang",
+        "pack.mcmeta"
+      ]
+    },
+    "1.12.2": {
+      "metadata_profile": "legacy",
+      "block_textures": "blocks",
+      "item_textures": "items",
+      "language_file": "en_us.lang",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.pack_format": 3,
+            "pack.description": "Soundtrack Selector resources"
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "func_110442_L"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "required_assets": [
+        "assets/{mod_id}/lang/en_us.lang",
+        "pack.mcmeta"
+      ]
+    },
+    "1.16.5": {
+      "metadata_profile": "forge",
+      "block_textures": "block",
+      "item_textures": "item",
+      "language_file": "en_us.json",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.description": "Soundtrack Selector resources",
+            "pack.pack_format": 6
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "func_195551_G"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "fml_range": "[36,)",
+      "loader_range": "[36.2.42,)",
+      "required_assets": [
+        "assets/{mod_id}/lang/en_us.json",
+        "pack.mcmeta"
+      ]
+    },
+    "1.18.2": {
+      "metadata_profile": "forge",
+      "block_textures": "block",
+      "item_textures": "item",
+      "language_file": "en_us.json",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.description": "Soundtrack Selector resources",
+            "pack.pack_format": 8
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "m_91098_"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "fml_range": "[40,)",
+      "loader_range": "[40.3.12,)",
+      "required_assets": [
+        "assets/{mod_id}/lang/en_us.json",
+        "pack.mcmeta"
+      ]
+    },
+    "1.20.1": {
+      "metadata_profile": "forge",
+      "block_textures": "block",
+      "item_textures": "item",
+      "language_file": "en_us.json",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.description": "Soundtrack Selector resources",
+            "pack.pack_format": 15
+          }
+        }
+      ],
+      "remapping": {
+        "required": true,
+        "checks": [
+          {
+            "class": "{package_path}/ClientAdapter.class",
+            "present": [
+              "m_91098_"
+            ],
+            "absent": [
+              "getResourceManager"
+            ]
+          }
+        ]
+      },
+      "fml_range": "[47,)",
+      "loader_range": "[47.4.10,)",
+      "required_assets": [
+        "assets/{mod_id}/lang/en_us.json",
+        "pack.mcmeta"
+      ]
+    },
+    "1.21.11": {
+      "metadata_profile": "neoforge",
+      "block_textures": "block",
+      "item_textures": "item",
+      "language_file": "en_us.json",
+      "required_classes": [],
+      "json_checks": [
+        {
+          "path": "pack.mcmeta",
+          "values": {
+            "pack.description": "Soundtrack Selector resources"
+          }
+        }
+      ],
+      "remapping": {
+        "required": false,
+        "checks": []
+      },
+      "fml_range": "[4,)",
+      "loader_range": "[21.11.45,)",
+      "required_assets": [
+        "assets/{mod_id}/lang/en_us.json",
+        "pack.mcmeta"
+      ]
+    }
+  },
+  "json_checks": []
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "modid": "soundtrackselector",
+    "name": "Soundtrack Selector",
+    "description": "Choose which discovered audio tracks can play as client background music.",
+    "version": "${fullVersion}",
+    "mcversion": "1.6.4",
+    "authorList": [
+      "GlowingFederal"
+    ]
+  }
+]

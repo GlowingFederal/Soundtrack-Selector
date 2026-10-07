@@ -1,0 +1,22 @@
+package com.glowingfederal.soundtrackselector;
+import com.glowingfederal.soundtrackselector.domain.Track;
+import net.minecraft.client.resources.sounds.*;
+import net.minecraft.client.sounds.*;
+import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundSource;
+
+final class TrackSound extends AbstractSoundInstance {
+    private final Sound chosen;
+    private final WeighedSoundEvents accessor;
+    TrackSound(Identifier context, Track track) {
+        super(context, SoundSource.MUSIC, net.minecraft.util.RandomSource.create());
+        volume = 1.0F; pitch = 1.0F; relative = true;
+        attenuation = SoundInstance.Attenuation.NONE;
+        String file = track.id.replace(":sounds/", ":").replaceFirst("\\.ogg$", "");
+        chosen = new Sound(Identifier.parse(file), net.minecraft.util.valueproviders.ConstantFloat.of(1.0F), net.minecraft.util.valueproviders.ConstantFloat.of(1.0F), 1, Sound.Type.FILE, true, false, 16);
+        sound = chosen;
+        accessor = new WeighedSoundEvents(context, null);
+        accessor.addSound(chosen);
+    }
+    @Override public WeighedSoundEvents resolve(SoundManager manager) { sound = chosen; return accessor; }
+}
