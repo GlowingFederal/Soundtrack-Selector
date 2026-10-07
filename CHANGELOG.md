@@ -35,4 +35,11 @@
 
 - Compile Minecraft 1.12.2, 1.16.5 and 1.18.2 against Recommended Forge 14.23.5.2859, 36.2.34 and 40.3.0; align loader metadata, target records and existing archive expectations with those compatibility floors. Preserve the existing Recommended Forge pins for other Forge targets and the stable NeoForge 21.11.45 baseline.
 - Correct legacy mcmod.info version-reference syntax and required Forge dependencies, preserving current gameplay and optional-client behavior.
+- Use the string dependency-information flag required by FML 1.6.4; keep the Boolean representation on later targets.
+- Use the lowercase forge dependency ID introduced by FML 1.12.2; retain the native Forge ID on earlier targets.
 - Bump the semantic patch version and start the corrected release at 1.0.1.1.
+
+2026-10-07 01:39 — Add manual production build pruning
+
+- Add opt-in root pruneBuilds and the portable Soundtrack Selector - Prune Old Builds IntelliJ configuration. Keep the newest production JAR independently per supported Minecraft target using creation time, with a modification-time fallback and deterministic ties.
+- Restrict cleanup to production filenames in target build/libs directories, excluding classifier/unrelated archives, nested outputs and redirected paths; preserve existing mod versioning and build behavior.

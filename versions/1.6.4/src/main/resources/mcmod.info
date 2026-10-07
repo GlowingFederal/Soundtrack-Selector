@@ -10,6 +10,6 @@
     ],
     "dependencies": ["Forge@[9.11.1.1345,)"],
     "requiredMods": ["Forge@[9.11.1.1345,)"],
-    "useDependencyInformation": true
+    "useDependencyInformation": "true"
   }
 ]
