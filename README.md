@@ -23,11 +23,13 @@ Resource reloads rebuild the cached catalog and preserve choices. For 1.6.4, dis
 | 1.6.4 | Forge 9.11.1.1345 | Unimined 1.4.1 / Gradle 8.13 | 21 | JDK 17, `--release 7`; game Java 8 |
 | 1.7.10 | Forge 10.13.4.1614 | GTNHGradle 2.0.34, RFG 2.0.6 / Gradle 9.7.1 | 25 | JDK 17 + Jabel, shipped Java 8 |
 | 1.8.9 | Forge 11.15.1.2318 | Unimined 1.4.1 / Gradle 8.13 | 21 | Java 8 |
-| 1.12.2 | Forge 14.23.5.2864 | Unimined 1.4.1 / Gradle 8.13 | 21 | Java 8 |
-| 1.16.5 | Forge 36.2.42 | ForgeGradle 6.0.54 / Gradle 8.13 | 21 | Java 8 |
-| 1.18.2 | Forge 40.3.12 | ModDevGradle Legacy Forge 2.0.148 / Gradle 8.13 | 21 | Java 17 |
+| 1.12.2 | Forge 14.23.5.2859 | Unimined 1.4.1 / Gradle 8.13 | 21 | Java 8 |
+| 1.16.5 | Forge 36.2.34 | ForgeGradle 6.0.54 / Gradle 8.13 | 21 | Java 8 |
+| 1.18.2 | Forge 40.3.0 | ModDevGradle Legacy Forge 2.0.148 / Gradle 8.13 | 21 | Java 17 |
 | 1.20.1 | Forge 47.4.10 | ModDevGradle Legacy Forge 2.0.148 / Gradle 8.13 | 21 | Java 17 |
 | 1.21.11 | NeoForge 21.11.45 | ModDevGradle 2.0.148 / Gradle 9.2.1 | 21 | Java 21 |
+
+The listed Forge builds are minimum supported versions, selected from the [official Recommended builds](https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json). Newer Forge builds for the same Minecraft version remain supported. Minecraft 1.21.11 uses the stable NeoForge 21.11.45 baseline; its JAR requires NeoForge.
 
 The 1.6.4 build keeps stock Forge/ASM 4.1 and verifies every final class is at most major 51. No launcher/library replacement is required.
 

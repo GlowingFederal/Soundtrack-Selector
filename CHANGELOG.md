@@ -30,3 +30,9 @@
 
 - Renamed Preview to Play across all eight targets and updated player hints and playback messages.
 - Added double-click playback on track rows through the existing player path; single clicks select, and checkbox clicks continue to change eligibility without starting audio.
+
+2026-10-07 00:28 — Restore Recommended Forge compatibility (1.0.1.1)
+
+- Compile Minecraft 1.12.2, 1.16.5 and 1.18.2 against Recommended Forge 14.23.5.2859, 36.2.34 and 40.3.0; align loader metadata, target records and existing archive expectations with those compatibility floors. Preserve the existing Recommended Forge pins for other Forge targets and the stable NeoForge 21.11.45 baseline.
+- Correct legacy mcmod.info version-reference syntax and required Forge dependencies, preserving current gameplay and optional-client behavior.
+- Bump the semantic patch version and start the corrected release at 1.0.1.1.

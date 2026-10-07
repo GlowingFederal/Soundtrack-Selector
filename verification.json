@@ -282,7 +282,7 @@
         ]
       },
       "fml_range": "[36,)",
-      "loader_range": "[36.2.42,)",
+      "loader_range": "[36.2.34,)",
       "required_assets": [
         "assets/{mod_id}/lang/en_us.json",
         "pack.mcmeta"
@@ -318,7 +318,7 @@
         ]
       },
       "fml_range": "[40,)",
-      "loader_range": "[40.3.12,)",
+      "loader_range": "[40.3.0,)",
       "required_assets": [
         "assets/{mod_id}/lang/en_us.json",
         "pack.mcmeta"

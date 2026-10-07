@@ -10,7 +10,7 @@ description="Choose which discovered audio tracks can play as client background 
 [[dependencies.soundtrackselector]]
 modId="forge"
 mandatory=true
-versionRange="[40.3.12,)"
+versionRange="[40.3.0,)"
 ordering="NONE"
 side="CLIENT"
 [[dependencies.soundtrackselector]]
