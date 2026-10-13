@@ -8,9 +8,9 @@ public final class Catalog {
     private Track[] enabled = new Track[0];
     private Track[] order;
     private int cursor;
-    private static final Comparator<Track> BY_NAME = new Comparator<Track>() {
+    private final Comparator<Track> BY_NAME = new Comparator<Track>() {
         public int compare(Track a, Track b) {
-            int result = a.name.compareToIgnoreCase(b.name);
+            int result = preferences.displayName(a).compareToIgnoreCase(preferences.displayName(b));
             return result == 0 ? a.id.compareTo(b.id) : result;
         }
     };

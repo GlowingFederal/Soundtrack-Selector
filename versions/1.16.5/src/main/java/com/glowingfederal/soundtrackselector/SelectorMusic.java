@@ -1,71 +1,67 @@
 package com.glowingfederal.soundtrackselector;
 import com.glowingfederal.soundtrackselector.domain.*;
 import java.lang.reflect.Field;
-import java.util.Random;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.*;
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.ResourceLocation;
 
+/** Installed only during explicit custom playback; the original scheduler retains its state. */
 final class SelectorMusic extends MusicTicker implements Library.Playback {
-    private static final Field CURRENT = FieldAccess.unique(MusicTicker.class, ISound.class);
-    private static final Field DELAY = FieldAccess.unique(MusicTicker.class, int.class);
+    private static final Field CONTROLLER = FieldAccess.unique(Minecraft.class, MusicTicker.class);
+    private static final Field NATIVE_CURRENT = FieldAccess.unique(MusicTicker.class, ISound.class);
     private final Minecraft mc;
-    private final Random random = new Random();
+    private MusicTicker original;
+    private ISound sound;
     private Track selected;
-    private boolean preview, paused;
+    private boolean paused;
+    private int grace;
     private Object world;
     SelectorMusic(Minecraft mc) { super(mc); this.mc = mc; world = mc.level; }
-    void reset() { stopPlaying(); selected = null; preview = false; paused = false; FieldAccess.set(DELAY, this, 100); }
+    void reset() {
+        if (sound != null) mc.getSoundManager().stop(sound);
+        sound = null; selected = null; paused = false; grace = 0;
+        if (original != null && FieldAccess.get(CONTROLLER, mc) == this) FieldAccess.set(CONTROLLER, mc, original);
+        original = null;
+        ClientAdapter.library.relinquished();
+    }
     @Override public void tick() {
-        if (world != mc.level) { world = mc.level; reset(); }
-        if (selected != null && !preview && !ClientAdapter.library.catalog.preferences.enabled(selected)) reset();
-        if ((preview || paused) && Library.specialMusic(mc.getSituationalMusic().getEvent().getLocation().toString())) reset();
-        if (preview || paused) {
-            if (current() == null) {
-                if (preview && !paused) ClientAdapter.library.previewFinished(); else reset();
-            }
-            return;
+        if (world != mc.level || FieldAccess.get(CONTROLLER, mc) != this) {
+            world = mc.level; ClientAdapter.library.stop(); return;
         }
-        super.tick();
+        if (mc.getSituationalMusic() != null && Library.specialMusic(mc.getSituationalMusic().getEvent().getLocation().toString())) { ClientAdapter.library.stop(); return; }
+        if (grace > 0) grace--;
+        if (!paused && selected != null && current() == null) ClientAdapter.library.previewFinished();
     }
-    @Override public void startPlaying(BackgroundMusicSelector music) {
-        ResourceLocation context = music.getEvent().getLocation();
-        if (Library.specialMusic(context.toString())) { selected = null; super.startPlaying(music); return; }
-        Track track = ClientAdapter.library.catalog.next(random);
-        if (track == null) {
-            selected = null;
-            FieldAccess.set(DELAY, this, music.getMinDelay() == music.getMaxDelay() ? music.getMinDelay() : music.getMinDelay() + random.nextInt(music.getMaxDelay() - music.getMinDelay() + 1));
-            return;
-        }
-        ISound previous = (ISound) FieldAccess.get(CURRENT, this);
-        if (previous != null) mc.getSoundManager().stop(previous);
-        TrackSound sound = new TrackSound(context, track);
-        FieldAccess.set(CURRENT, this, sound);
-        selected = track;
-        ClientAdapter.library.played(track);
-        mc.getSoundManager().play(sound);
-        FieldAccess.set(DELAY, this, Integer.MAX_VALUE);
-    }
-
     @Override public void play(Track track) {
-        if (Library.specialMusic(mc.getSituationalMusic().getEvent().getLocation().toString())) { ClientAdapter.library.status = "Playback unavailable during dragon/credits music"; return; }
-        reset(); preview = true;
-        TrackSound sound = new TrackSound(new ResourceLocation("minecraft:music.menu"), track);
-        FieldAccess.set(CURRENT, this, sound);
-        selected = track;
+        if (mc.getSituationalMusic() != null && Library.specialMusic(mc.getSituationalMusic().getEvent().getLocation().toString())) { ClientAdapter.library.status = "Playback unavailable during dragon/credits music"; return; }
+        if (original == null) {
+            original = (MusicTicker) FieldAccess.get(CONTROLLER, mc);
+            ISound previous = (ISound) FieldAccess.get(NATIVE_CURRENT, original);
+            // Stop only the controller's own background instance. Records and independent mod sounds are untouched.
+            if (previous != null) mc.getSoundManager().stop(previous);
+            FieldAccess.set(CONTROLLER, mc, this);
+        }
+        if (sound != null) mc.getSoundManager().stop(sound);
+        world = mc.level; paused = false; grace = 40;
+        sound = new TrackSound(new ResourceLocation("minecraft:music.menu"), track); selected = track;
         mc.getSoundManager().play(sound);
         ClientAdapter.library.played(track);
-        FieldAccess.set(DELAY, this, Integer.MAX_VALUE);
     }
-    @Override public void stop() { if (selected != null) reset(); }
+    void checkOwnership() { if (original != null && FieldAccess.get(CONTROLLER, mc) != this) ClientAdapter.library.stop(); }
+    @Override public void stop() { reset(); }
     @Override public Track current() {
-        ISound sound = (ISound) FieldAccess.get(CURRENT, this);
-        return selected != null && sound != null && mc.getSoundManager().isActive(sound) ? selected : null;
+        return selected != null && sound != null && (paused || grace > 0 || mc.getSoundManager().isActive(sound)) ? selected : null;
     }
     @Override public boolean paused() { return paused; }
     @Override public void togglePause() {
-        ISound sound = (ISound) FieldAccess.get(CURRENT, this);
         if (sound != null && TrackPlayback.pause(mc.getSoundManager(), sound, !paused)) paused = !paused;
     }
-    @Override public void release() { if (preview) reset(); }
+    @Override public void release() { ClientAdapter.library.stop(); }
+    // An external request belongs to the native controller, never to the catalog.
+    @Override public void startPlaying(BackgroundMusicSelector music) {
+        MusicTicker controller = original;
+        reset();
+        if (controller != null) controller.startPlaying(music);
+    }
+    @Override public void stopPlaying() { reset(); }
 }

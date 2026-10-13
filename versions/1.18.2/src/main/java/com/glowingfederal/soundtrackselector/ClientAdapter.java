@@ -14,6 +14,17 @@ public final class ClientAdapter {
     static final Logger LOG = LogManager.getLogger("Soundtrack Selector");
     static Library library;
     static final KeyMapping OPEN = new KeyMapping("key.soundtrackselector.open", 77, "key.categories.soundtrackselector");
+    private static Collection<String> vanillaEvents() {
+        List<String> events = new ArrayList<String>();
+        // Native constants identify categories; the game still resolves biome/dimension contexts at runtime.
+        for (java.lang.reflect.Field field : net.minecraft.sounds.Musics.class.getDeclaredFields()) {
+            if (field.getType() != net.minecraft.sounds.Music.class || !java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+            field.setAccessible(true);
+            net.minecraft.sounds.Music type = (net.minecraft.sounds.Music) FieldAccess.get(field, null);
+            events.add(type.getEvent().getLocation().toString());
+        }
+        return events;
+    }
     private static volatile boolean reload = true;
     private static SelectorMusic music;
     public static void register(net.minecraftforge.eventbus.api.IEventBus bus) {
@@ -23,7 +34,7 @@ public final class ClientAdapter {
                 public void info(String message) { LOG.info(message); }
                 public void warning(String message, Throwable failure) { LOG.warn(message, failure); }
                 public void debug(String message, Throwable failure) { LOG.debug(message, failure); }
-            });
+            }, "1.18.2", vanillaEvents());
             net.minecraftforge.client.ClientRegistry.registerKeyBinding(OPEN);
         }));
         bus.addListener((net.minecraftforge.client.event.RegisterClientReloadListenersEvent event) ->
@@ -36,18 +47,11 @@ public final class ClientAdapter {
         if (library == null) return;
         Minecraft mc = Minecraft.getInstance();
         if (music == null) {
-            java.lang.reflect.Field field = FieldAccess.unique(Minecraft.class, net.minecraft.client.sounds.MusicManager.class);
-            Object previous = FieldAccess.get(field, mc);
-            if (previous.getClass() != net.minecraft.client.sounds.MusicManager.class) {
-                LOG.warn("Another mod replaced the music manager; Soundtrack Selector cannot install its music hook");
-                library = null;
-                return;
-            }
             music = new SelectorMusic(mc);
             library.playback = music;
-            FieldAccess.set(field, mc, music);
         }
-        if (reload) { reload = false; music.reset(); discover(mc); }
+        music.checkOwnership();
+        if (reload) { reload = false; library.stop(); discover(mc); }
         while (OPEN.consumeClick()) if (mc.screen == null) mc.setScreen(new SelectorScreen(null));
     }
     private static void discover(Minecraft mc) {
@@ -65,20 +69,26 @@ public final class ClientAdapter {
             }
         }
         Map<String, String> files = definitions.files();
+        Map<String, String> aliases = definitions.aliasIds();
         java.lang.reflect.Field entries = FieldAccess.unique(net.minecraft.client.sounds.WeighedSoundEvents.class, List.class);
         for (ResourceLocation event : mc.getSoundManager().getAvailableSounds()) {
             net.minecraft.client.sounds.WeighedSoundEvents accessor = mc.getSoundManager().getSoundEvent(event);
             if (accessor == null) continue;
+            int slot = 0;
             for (Object entry : (List<?>) FieldAccess.get(entries, accessor)) {
+                int index = slot++;
                 if (entry instanceof net.minecraft.client.resources.sounds.Sound) {
                     net.minecraft.client.resources.sounds.Sound sound = (net.minecraft.client.resources.sounds.Sound) entry;
                     if (sound.getType() == net.minecraft.client.resources.sounds.Sound.Type.FILE && sound.getWeight() > 0) {
                         String resource = sound.getPath().toString();
-                        if (!files.containsKey(resource)) files.put(resource, event.toString());
+                        if (!files.containsKey(resource)) {
+                            files.put(resource, event.toString());
+                            aliases.put(resource, event.toString() + "#" + index);
+                        }
                     }
                 }
             }
         }
-        library.discover(files, id -> manager.getResource(new ResourceLocation(id)).getInputStream());
+        library.discover(files, id -> manager.getResource(new ResourceLocation(id)).getInputStream(), aliases);
     }
 }

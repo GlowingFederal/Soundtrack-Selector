@@ -11,8 +11,13 @@ public final class Track {
     public final String searchText;
     public final double seconds;
     public final boolean music;
+    private final String alias;
 
     public Track(String id, String event, double seconds) {
+        this(id, event, seconds, event.indexOf(':') >= 0 && !event.endsWith(".ogg") ? event : id);
+    }
+    public Track(String id, String event, double seconds, String alias) {
+        this.alias = alias;
         this.id = id;
         this.event = event;
         this.seconds = seconds;
@@ -44,4 +49,7 @@ public final class Track {
         int total = (int) seconds;
         return (total / 60) + ":" + (total % 60 < 10 ? "0" : "") + (total % 60);
     }
+
+    /** Event identity survives a pack replacing the file behind the sound. Legacy pools fall back to the resource. */
+    public String aliasId() { return alias; }
 }

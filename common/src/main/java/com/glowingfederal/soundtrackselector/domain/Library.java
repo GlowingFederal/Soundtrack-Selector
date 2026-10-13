@@ -21,13 +21,16 @@ public final class Library {
     }
     public Playback playback;
     private long started, pausedAt;
-    public void played(Track track) { started = System.nanoTime(); pausedAt = 0; }
+    private boolean custom;
+    public boolean custom() { return custom; }
+    public void played(Track track) { custom = true; started = System.nanoTime(); pausedAt = 0; }
     public void play(Track track) {
         if (playback == null || track == null) return;
         catalog.begin(track, playerRandom);
         playback.play(track);
     }
-    public void stop() { if (playback != null) playback.stop(); }
+    public void relinquished() { custom = false; }
+    public void stop() { if (playback != null) playback.stop(); custom = false; catalog.preferences.returnToVanilla(); catalog.refresh(); save(); }
     public void next() {
         if (playback == null) return;
         Track track = catalog.next(playerRandom);
@@ -60,21 +63,29 @@ public final class Library {
     public String status = "Waiting for sound resources";
     private boolean writable = true;
 
-    public Library(File directory, Log log) {
+    public Library(File directory, Log log, String target, Collection<String> vanillaEvents) {
         this.log = log;
         File file = new File(directory, "soundtrackselector.json");
         Preferences preferences;
         try { preferences = new Preferences(file); }
         catch (IOException failure) {
-            log.warning("Cannot read " + file + "; preserving the file and using enabled defaults for this session", failure);
+            log.warning("Cannot read " + file + "; preserving the file and using Vanilla for this session", failure);
             writable = false;
             try { preferences = new Preferences(null); }
             catch (IOException impossible) { throw new IllegalStateException(impossible); }
         }
         catalog = new Catalog(preferences);
+        try {
+            // Recovery is independent of whether the user's configuration is readable.
+            preferences.maintainVanilla(directory, target, vanillaEvents);
+            if (writable) preferences.save();
+        } catch (IOException failure) { log.warning("Cannot maintain Vanilla recovery configuration", failure); }
     }
 
     public void discover(Map<String, String> files, Resources resources) {
+        discover(files, resources, Collections.<String, String>emptyMap());
+    }
+    public void discover(Map<String, String> files, Resources resources, Map<String, String> aliases) {
         List<Track> tracks = new ArrayList<Track>();
         Set<String> namespaces = new HashSet<String>();
         int musicCount = 0;
@@ -86,7 +97,9 @@ public final class Library {
                 double duration;
                 try { duration = OggDuration.read(input); } finally { input.close(); }
                 if (duration > 10.0) {
-                    Track track = new Track(file.getKey(), file.getValue(), duration);
+                    String alias = aliases.get(file.getKey());
+                    Track track = alias == null ? new Track(file.getKey(), file.getValue(), duration)
+                            : new Track(file.getKey(), file.getValue(), duration, alias);
                     tracks.add(track);
                     if (track.music) musicCount++;
                     namespaces.add(track.namespace);
@@ -113,14 +126,19 @@ public final class Library {
             log.warning("Cannot save soundtrackselector.json", failure);
         }
     }
-    public void nextPlaylist() { catalog.preferences.nextPlaylist(); catalog.refresh(); stop(); save(); }
+    public void nextPlaylist() { if (playback != null) playback.stop(); custom = false; catalog.preferences.nextPlaylist(); catalog.refresh(); save(); }
     public void toggleLoop() { catalog.preferences.toggleLoop(); save(); }
     public void toggleRandomOrder() { catalog.preferences.toggleRandomOrder(); catalog.restart(); save(); }
     public boolean createPlaylist(String name) {
         if (!catalog.preferences.createPlaylist(name)) { status = "Use a unique playlist name (1-48 characters)"; return false; }
-        catalog.refresh(); stop(); save(); return true;
+        if (playback != null) playback.stop(); custom = false; catalog.refresh(); save(); return true;
     }
-    public void deletePlaylist() { catalog.preferences.deletePlaylist(); catalog.refresh(); stop(); save(); }
+    public void deletePlaylist() { if (playback != null) playback.stop(); custom = false; catalog.preferences.deletePlaylist(); catalog.refresh(); save(); }
+    public void rename(Track track, String name) {
+        if (track == null) return;
+        if (!catalog.preferences.rename(track, name)) { status = "Nickname must be at most 128 characters without control characters"; return; }
+        catalog.refresh(); save();
+    }
     public void toggle(Track track) { catalog.toggle(track); save(); }
     public void setTracks(Collection<Track> tracks, boolean enabled) { catalog.set(tracks, enabled); save(); }
     public void setAll(boolean enabled) { catalog.setAll(enabled); save(); }

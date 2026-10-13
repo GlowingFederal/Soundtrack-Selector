@@ -13,6 +13,9 @@ public final class PlayerView {
     public int width, height;
     public String query = "";
     public String playlistName = "";
+    public boolean editingNickname;
+    private String previousQuery;
+    private Track nicknameTrack;
     private boolean deleteArmed;
     private String clickedTrack;
     private long clickedAt;
@@ -20,9 +23,18 @@ public final class PlayerView {
     public int left() { return width >= 460 ? 144 : 16; }
     private boolean compact() { return height < 300; }
     public int visible() { return Math.max(1, (height - (compact() ? 180 : 212)) / 26); }
-    public List<Track> rows() { List<Track> rows = list.rows(query); list.clamp(visible()); return rows; }
+    public List<Track> rows() { List<Track> rows = list.rows(editingNickname ? previousQuery : query); list.clamp(visible()); return rows; }
     public void action(int id) {
         clickedTrack = null;
+        if (id == 18) {
+            if (editingNickname) {
+                library.rename(nicknameTrack, query); query = previousQuery; editingNickname = false;
+            } else if (list.selected != null) {
+                nicknameTrack = list.selected; previousQuery = query;
+                query = library.catalog.preferences.nickname(nicknameTrack); editingNickname = true;
+            }
+            return;
+        }
         if (id != 15) deleteArmed = false;
         if (id == 13) library.nextPlaylist();
         if (id == 14) library.createPlaylist(playlistName);
@@ -40,6 +52,7 @@ public final class PlayerView {
         if (id >= 10 && id <= 12) list.filter(id - 10);
     }
     public boolean click(double x, double y) {
+        if (editingNickname) return false;
         if (x < left() || x >= width - 16 || y < 118 || y >= 118 + visible() * 26) { clickedTrack = null; return false; }
         List<Track> rows = rows();
         int index = list.offset + (int) ((y - 118) / 26);
@@ -58,6 +71,8 @@ public final class PlayerView {
     }
     public void scroll(int delta) { clickedTrack = null; rows(); int step = Math.min(Math.abs(delta), visible()); list.scroll(delta < 0 ? -step : step, visible()); }
     public String label(int id) {
+        if (id == 18) return editingNickname ? "Save name" : "Nickname";
+        if (id == 9) return library.custom() ? "Next" : "Start";
         if (id == 13) return library.catalog.preferences.activePlaylist();
         if (id == 15) return deleteArmed ? "Sure?" : "Delete";
         if (id == 16) return "Loop: " + (library.catalog.preferences.loop() ? "On" : "Off");
@@ -68,9 +83,13 @@ public final class PlayerView {
         return "";
     }
     public boolean available(int id) {
-        if (id == 15) return !library.catalog.preferences.activePlaylist().equals("Default");
+        if (id == 18) return editingNickname || list.selected != null;
+        if (editingNickname && id != 3) return false;
+        if (id == 1 || id == 2) return !library.catalog.preferences.vanilla();
+        if (id == 15) return !library.catalog.preferences.vanilla() && !library.catalog.preferences.activePlaylist().equals("Default");
         if (id == 6) return list.selected != null && library.playback != null;
-        if (id == 7 || id == 8) return library.playback != null && library.playback.current() != null;
+        if (id == 8) return library.custom();
+        if (id == 7) return library.playback != null && library.playback.current() != null;
         if (id == 9) return library.playback != null && library.catalog.hasEnabled();
         return true;
     }
@@ -98,8 +117,8 @@ public final class PlayerView {
             if (selected) c.rectangle(left, top, left + 2, top + 24, 0xff7ce6b5);
             c.rectangle(left + 8, top + 8, left + 20, top + 20, enabled ? 0xff7ce6b5 : 0xff425568);
             c.text(enabled ? "+" : "-", left + 11, top + 10, 9, enabled ? 0xff10231d : 0xffc6d4e0);
-            c.text(track.name, left + 30, top + 4, right - left - 76, 0xffeef4fa);
-            c.text(track.namespace + (track.music ? "  /  Music" : "  /  Other audio"), left + 30, top + 16, right - left - 76, 0xff8094a8);
+            c.text(library.catalog.preferences.displayName(track), left + 30, top + 4, right - left - 76, 0xffeef4fa);
+            c.text(track.event, left + 30, top + 16, right - left - 76, 0xff8094a8);
             c.text(track.durationText(), right - 42, top + 10, 38, 0xffc6d4e0);
         }
         if (rows.isEmpty()) c.text("No matching tracks. Try Long audio or another search.", left, 122, right - left, 0xff8094a8);
@@ -115,8 +134,8 @@ public final class PlayerView {
         c.rectangle(0, height - (compact() ? 60 : 80), width, height - (compact() ? 59 : 79), 0xff2c4254);
         Track playing = library.playback == null ? null : library.playback.current();
         Track details = list.selected;
-        if (!compact()) c.text(details == null ? "Select a track, then Play, or double-click to listen" : "Selected: " + details.name + " / " + details.id, 16, height - 71, width - 32, 0xffc6d4e0);
-        c.text(playing == null ? "NOW PLAYING   Waiting for background music" : (library.playback.paused() ? "PAUSED   " : "NOW PLAYING   ") + playing.name + " / " + playing.namespace,
+        if (!compact()) c.text(details == null ? "Select a track, then Play, or double-click to listen" : "Selected: " + library.catalog.preferences.displayName(details) + " / " + details.id, 16, height - 71, width - 32, 0xffc6d4e0);
+        c.text(playing == null ? "VANILLA   Minecraft controls music" : (library.playback.paused() ? "PAUSED   " : "NOW PLAYING   ") + library.catalog.preferences.displayName(playing) + " / " + playing.namespace,
                 16, height - 56, width - 32, 0xff7ce6b5);
         c.rectangle(16, height - 40, width - 16, height - 37, 0xff2c4254);
         if (playing != null) {

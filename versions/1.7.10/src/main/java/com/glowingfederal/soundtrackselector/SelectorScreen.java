@@ -26,9 +26,10 @@ public final class SelectorScreen extends GuiScreen implements PlayerView.Canvas
         add(4, left, 90, 90, player.label(4)); add(5, left + 94, 90, 76, player.label(5));
         add(1, left + 174, 90, 48, "All on"); add(2, left + 226, 90, 48, "All off");
         add(13, left, 38, 90, player.label(13)); add(14, left + 174, 38, 48, "New"); add(15, left + 226, 38, 48, "Delete");
-        add(6, 16, height - 28, 56, "Play"); add(7, 76, height - 28, 52, "Pause");
-        add(8, 132, height - 28, 44, "Stop"); add(9, 180, height - 28, 44, "Next");
-        add(3, width - 72, height - 28, 56, "Done");
+        add(6, 16, height - 28, 44, "Play"); add(7, 64, height - 28, 44, "Pause");
+        add(8, 112, height - 28, 36, "Stop"); add(9, 152, height - 28, 36, "Next");
+        add(18, 192, height - 28, 64, player.label(18));
+        add(3, width - 60, height - 28, 44, "Done");
         if (width >= 460) {
             add(10, 10, 72, 108, "Music"); add(11, 10, 98, 108, "Soundtrack"); add(12, 10, 124, 108, "Long audio");
         }
@@ -40,11 +41,11 @@ public final class SelectorScreen extends GuiScreen implements PlayerView.Canvas
         search.drawTextBox(); playlistName.drawTextBox();
         for (Object object : buttonList) {
             GuiButton button = (GuiButton) object;
-            if (button.id == 4 || button.id == 5 || button.id == 7 || button.id == 13 || button.id == 15 || button.id == 16 || button.id == 17) button.displayString = player.label(button.id);
+            if (button.id == 4 || button.id == 5 || button.id == 7 || button.id == 9 || button.id == 13 || button.id == 15 || button.id == 16 || button.id == 17 || button.id == 18) button.displayString = player.label(button.id);
             button.enabled = player.available(button.id);
         }
         super.drawScreen(x, y, partial);
-        if (search.getText().length() == 0 && !search.isFocused()) text("Search tracks or source", player.left()+4, 70, width-player.left()-24, 0xff8094a8);
+        if (search.getText().length() == 0 && !search.isFocused()) text(player.editingNickname ? "Nickname (empty clears)" : "Search tracks or source", player.left()+4, 70, width-player.left()-24, 0xff8094a8);
         if (playlistName.getText().length() == 0 && !playlistName.isFocused()) text("New name", player.left()+98, 44, 68, 0xff8094a8);
     }
     @Override public void rectangle(int left, int top, int right, int bottom, int color) { drawRect(left, top, right, bottom, color); }
@@ -57,7 +58,7 @@ public final class SelectorScreen extends GuiScreen implements PlayerView.Canvas
         if (button == 0) player.click(x, y);
     }
     @Override protected void actionPerformed(GuiButton button) {
-        if (button.id == 3) mc.displayGuiScreen(parent); else { player.query = search.getText(); player.playlistName = playlistName.getText(); player.action(button.id); }
+        if (button.id == 3) mc.displayGuiScreen(parent); else { player.query = search.getText(); player.playlistName = playlistName.getText(); player.action(button.id); if (button.id == 18) { search.setText(player.query); search.setFocused(true); } }
     }
     @Override public void handleMouseInput() {
         super.handleMouseInput();

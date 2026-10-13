@@ -22,12 +22,18 @@ import org.lwjgl.input.Keyboard;
 
 public final class ClientAdapter extends CommonProxy implements ITickHandler, Library.Playback {
     static Library library;
+    private static Collection<String> vanillaEvents() {
+        // This generation has a native background pool rather than sound events.
+        return Collections.singletonList("minecraft:music");
+    }
     private volatile boolean reload = true;
     private Track selected;
     private boolean preview, paused;
     private int previewGrace;
     private Object world;
-    private final Random random = new Random();
+    private int savedDelay;
+    private float customVolume;
+    private static final String CUSTOM_SOURCE = "SoundtrackSelectorMusic";
     private final Map<String, URL> urls = new HashMap<String, URL>();
     private SoundManager manager;
     private static final Field MUSIC_DELAY = musicDelayField();
@@ -44,7 +50,7 @@ public final class ClientAdapter extends CommonProxy implements ITickHandler, Li
             public void info(String message) { FMLLog.log(Level.INFO, "%s", message); }
             public void warning(String message, Throwable failure) { FMLLog.log(Level.WARNING, failure, "%s", message); }
             public void debug(String message, Throwable failure) { FMLLog.log(Level.FINE, failure, "%s", message); }
-        });
+        }, "1.6.4", vanillaEvents());
         MinecraftForge.EVENT_BUS.register(this);
         TickRegistry.registerTickHandler(this, Side.CLIENT);
         KeyBindingRegistry.registerKeyBinding(new KeyBindingRegistry.KeyHandler(
@@ -63,27 +69,20 @@ public final class ClientAdapter extends CommonProxy implements ITickHandler, Li
         world = mc.theWorld;
         library.playback = this;
     }
-    @ForgeSubscribe public void soundLoaded(SoundLoadEvent event) { manager = event.manager; reload = true; }
+    @ForgeSubscribe public void soundLoaded(SoundLoadEvent event) { library.stop(); manager = event.manager; reload = true; }
     @ForgeSubscribe public void background(PlayBackgroundMusicEvent event) {
-        if (preview || paused) { event.result = null; FieldAccess.set(MUSIC_DELAY, manager, 12000); return; }
-        Track track = library.catalog.next(random);
-        selected = track;
-        library.played(track);
-        if (track == null) {
-            event.result = null;
-            // Vanilla only resets its delay after a non-null selection. Avoid retrying every tick.
-            FieldAccess.set(MUSIC_DELAY, manager, 12000);
-        } else event.result = new SoundPoolEntry(track.id, urls.get(track.id));
+        // Observation/indexing never changes a normal pool selection.
+        if (preview) event.result = null;
     }
     @Override public void tickStart(EnumSet<TickType> types, Object... data) {}
     @Override public void tickEnd(EnumSet<TickType> types, Object... data) {
         final Minecraft mc = Minecraft.getMinecraft();
-        if (world != mc.theWorld || reload || (selected != null && !preview && !library.catalog.preferences.enabled(selected))) {
-            world = mc.theWorld;
-            if (manager != null && manager.sndSystem != null) manager.sndSystem.stop("BgMusic");
-            selected = null; preview = false; paused = false; previewGrace = 0;
-        }
+        if (world != mc.theWorld || reload) { world = mc.theWorld; library.stop(); }
         if (reload) { reload = false; discover(mc); }
+        if (preview && manager != null && manager.sndSystem != null && customVolume != mc.gameSettings.musicVolume) {
+            customVolume = mc.gameSettings.musicVolume;
+            manager.sndSystem.setVolume(CUSTOM_SOURCE, customVolume);
+        }
         if (previewGrace > 0) previewGrace--;
         if (preview && !paused && current() == null) library.previewFinished();
     }
@@ -92,29 +91,39 @@ public final class ClientAdapter extends CommonProxy implements ITickHandler, Li
 
     @Override public void play(Track track) {
         if (manager == null || manager.sndSystem == null || !urls.containsKey(track.id)) return;
-        stop(); preview = true; selected = track; previewGrace = 40;
-        manager.sndSystem.backgroundMusic("BgMusic", urls.get(track.id), track.id, false);
-        manager.sndSystem.setVolume("BgMusic", Minecraft.getMinecraft().gameSettings.musicVolume);
-        manager.sndSystem.play("BgMusic");
-        FieldAccess.set(MUSIC_DELAY, manager, 12000);
+        if (!preview) {
+            savedDelay = ((Integer) FieldAccess.get(MUSIC_DELAY, manager)).intValue();
+            manager.sndSystem.stop("BgMusic");
+        }
+        manager.sndSystem.stop(CUSTOM_SOURCE);
+        preview = true; paused = false; selected = track; previewGrace = 40;
+        manager.sndSystem.backgroundMusic(CUSTOM_SOURCE, urls.get(track.id), track.id, false);
+        customVolume = Minecraft.getMinecraft().gameSettings.musicVolume;
+        manager.sndSystem.setVolume(CUSTOM_SOURCE, customVolume);
+        manager.sndSystem.play(CUSTOM_SOURCE);
+        FieldAccess.set(MUSIC_DELAY, manager, Integer.MAX_VALUE);
         library.played(track);
     }
     @Override public void stop() {
-        if (manager != null && manager.sndSystem != null) manager.sndSystem.stop("BgMusic");
+        if (preview && manager != null) {
+            if (manager.sndSystem != null) manager.sndSystem.stop(CUSTOM_SOURCE);
+            // Restore the native countdown captured at acquisition, never force an early song.
+            FieldAccess.set(MUSIC_DELAY, manager, savedDelay);
+        }
         selected = null; preview = false; paused = false; previewGrace = 0;
-        if (manager != null) FieldAccess.set(MUSIC_DELAY, manager, 100);
+        library.relinquished();
     }
     @Override public Track current() {
         return selected != null && manager != null && manager.sndSystem != null
-                && (previewGrace > 0 || paused || manager.sndSystem.playing("BgMusic")) ? selected : null;
+                && (previewGrace > 0 || paused || manager.sndSystem.playing(CUSTOM_SOURCE)) ? selected : null;
     }
     @Override public void togglePause() {
         if (current() == null) return;
-        if (paused) manager.sndSystem.play("BgMusic"); else manager.sndSystem.pause("BgMusic");
+        if (paused) manager.sndSystem.play(CUSTOM_SOURCE); else manager.sndSystem.pause(CUSTOM_SOURCE);
         paused = !paused;
     }
     @Override public boolean paused() { return paused; }
-    @Override public void release() { if (preview) stop(); }
+    @Override public void release() { library.stop(); }
 
     @SuppressWarnings("unchecked")
     private void discover(final Minecraft mc) {

@@ -27,12 +27,12 @@ public final class ListView {
             for (Track track : catalog.tracks()) {
                 if (filter == 0 && !track.music) continue;
                 if (filter == 1 && !catalog.preferences.enabled(track)) continue;
-                if (track.searchText.contains(query)) filtered.add(track);
+                if (track.searchText.contains(query) || catalog.preferences.displayName(track).toLowerCase(Locale.ROOT).contains(query)) filtered.add(track);
             }
             Collections.sort(filtered, new Comparator<Track>() {
                 public int compare(Track a, Track b) {
                     int value = sort == 2 ? Double.compare(b.seconds, a.seconds)
-                            : sort == 1 ? a.namespace.compareTo(b.namespace) : a.name.compareTo(b.name);
+                            : sort == 1 ? a.namespace.compareTo(b.namespace) : catalog.preferences.displayName(a).compareTo(catalog.preferences.displayName(b));
                     return value != 0 ? value : a.id.compareTo(b.id);
                 }
             });

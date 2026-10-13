@@ -7,6 +7,7 @@ import java.util.*;
 /** Mirrors sounds.json pack stacking and event references without game types. */
 public final class SoundDefinitions {
     private final Map<String, List<Reference>> events = new TreeMap<String, List<Reference>>();
+    private final Map<String, String> aliases = new TreeMap<String, String>();
 
     public void add(String namespace, Reader reader) {
         JsonObject root = new JsonParser().parse(reader).getAsJsonObject();
@@ -44,18 +45,26 @@ public final class SoundDefinitions {
 
     public Map<String, String> files() {
         Map<String, String> result = new TreeMap<String, String>();
-        for (String event : events.keySet()) collect(event, event, new HashSet<String>(), result);
+        aliases.clear();
+        for (String event : events.keySet()) collect(event, event, "", new HashSet<String>(), result);
         return result;
     }
-    private void collect(String event, String origin, Set<String> visiting, Map<String, String> result) {
+    public Map<String, String> aliasIds() { return new TreeMap<String, String>(aliases); }
+    private void collect(String event, String origin, String path, Set<String> visiting, Map<String, String> result) {
         if (visiting.size() >= 128 || !visiting.add(event)) return;
         List<Reference> refs = events.get(event);
-        if (refs != null) for (Reference ref : refs) {
-            if (ref.event) collect(ref.id, origin, visiting, result);
+        if (refs != null) for (int i = 0; i < refs.size(); i++) {
+            Reference ref = refs.get(i);
+            String slot = path.length() == 0 ? Integer.toString(i) : path + "." + i;
+            if (ref.event) collect(ref.id, origin, slot, visiting, result);
             else {
                 int colon = ref.id.indexOf(':');
                 String resource = ref.id.substring(0, colon + 1) + "sounds/" + ref.id.substring(colon + 1) + ".ogg";
-                if (!result.containsKey(resource) || Track.musicHint(origin)) result.put(resource, origin);
+                if (!result.containsKey(resource) || Track.musicHint(origin)) {
+                    result.put(resource, origin);
+                    // A sound event can contain several tracks. Retain its definition slot, not the resolved filename.
+                    aliases.put(resource, origin + "#" + slot);
+                }
             }
         }
         visiting.remove(event);

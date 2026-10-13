@@ -20,6 +20,11 @@ public final class ClientAdapter extends CommonProxy {
     static Library library;
     static final KeyBinding OPEN = new KeyBinding("key.soundtrackselector.open", Keyboard.KEY_M, "key.categories.soundtrackselector");
     static final Map<String, ResourceLocation> nativeTracks = new HashMap<String, ResourceLocation>();
+    private static Collection<String> vanillaEvents() {
+        List<String> events = new ArrayList<String>();
+        for (MusicTicker.MusicType type : MusicTicker.MusicType.values()) events.add(type.getMusicLocation().toString());
+        return events;
+    }
     private volatile boolean reload = true;
     private SelectorMusic music;
     @Override public void init() {
@@ -28,7 +33,7 @@ public final class ClientAdapter extends CommonProxy {
             public void info(String message) { LOG.info(message); }
             public void warning(String message, Throwable failure) { LOG.warn(message, failure); }
             public void debug(String message, Throwable failure) { LOG.debug(message, failure); }
-        });
+        }, "1.8.9", vanillaEvents());
         ClientRegistry.registerKeyBinding(OPEN);
         ((IReloadableResourceManager) mc.getResourceManager()).registerReloadListener(new IResourceManagerReloadListener() {
             @Override public void onResourceManagerReload(IResourceManager manager) { reload = true; }
@@ -39,18 +44,11 @@ public final class ClientAdapter extends CommonProxy {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft mc = Minecraft.getMinecraft();
         if (music == null) {
-            java.lang.reflect.Field field = FieldAccess.unique(Minecraft.class, MusicTicker.class);
-            Object previous = FieldAccess.get(field, mc);
-            if (previous.getClass() != MusicTicker.class) {
-                LOG.warn("Another mod replaced the music ticker; Soundtrack Selector cannot install its music hook");
-                FMLCommonHandler.instance().bus().unregister(this);
-                return;
-            }
             music = new SelectorMusic(mc);
             library.playback = music;
-            FieldAccess.set(field, mc, music);
         }
-        if (reload) { reload = false; music.reset(); discover(mc); }
+        music.checkOwnership();
+        if (reload) { reload = false; library.stop(); discover(mc); }
         while (OPEN.isPressed()) if (mc.currentScreen == null) mc.displayGuiScreen(new SelectorScreen(null));
     }
     private void discover(final Minecraft mc) {
@@ -70,6 +68,7 @@ public final class ClientAdapter extends CommonProxy {
             }
         }
         Map<String, String> files = definitions.files();
+        Map<String, String> aliases = definitions.aliasIds();
         SoundRegistry nativeRegistry = (SoundRegistry) FieldAccess.get(FieldAccess.unique(SoundHandler.class, SoundRegistry.class), mc.getSoundHandler());
         Map<?, ?> registered = (Map<?, ?>) FieldAccess.get(FieldAccess.unique(SoundRegistry.class, Map.class), nativeRegistry);
         java.lang.reflect.Field list = FieldAccess.unique(SoundEventAccessorComposite.class, List.class);
@@ -77,17 +76,22 @@ public final class ClientAdapter extends CommonProxy {
         for (Object event : registered.values()) {
             SoundEventAccessorComposite accessor = (SoundEventAccessorComposite) event;
             if (accessor.getSoundEventLocation().getResourceDomain().equals("soundtrackselector")) continue;
+            int slot = 0;
             for (Object entry : (List<?>) FieldAccess.get(list, accessor)) {
+                int index = slot++;
                 if (entry instanceof SoundEventAccessor) {
                     SoundPoolEntry sound = (SoundPoolEntry) FieldAccess.get(file, entry);
                     String resource = sound.getSoundPoolEntryLocation().toString();
-                    if (!files.containsKey(resource)) files.put(resource, accessor.getSoundEventLocation().toString());
+                    if (!files.containsKey(resource)) {
+                        files.put(resource, accessor.getSoundEventLocation().toString());
+                        aliases.put(resource, accessor.getSoundEventLocation().toString() + "#" + index);
+                    }
                 }
             }
         }
         library.discover(files, new Library.Resources() {
             public InputStream open(String id) throws IOException { return manager.getResource(new ResourceLocation(id)).getInputStream(); }
-        });
+        }, aliases);
         SoundRegistry registry = (SoundRegistry) FieldAccess.get(FieldAccess.unique(SoundHandler.class, SoundRegistry.class), mc.getSoundHandler());
         nativeTracks.clear();
         int index = 0;

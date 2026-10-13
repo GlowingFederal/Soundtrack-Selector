@@ -33,9 +33,10 @@ public final class SelectorScreen extends Screen implements PlayerView.Canvas {
         add(4, left, 90, 90, player.label(4)); add(5, left + 94, 90, 76, player.label(5));
         add(1, left + 174, 90, 48, "All on"); add(2, left + 226, 90, 48, "All off");
         add(13, left, 38, 90, player.label(13)); add(14, left + 174, 38, 48, "New"); add(15, left + 226, 38, 48, "Delete");
-        add(6, 16, height - 28, 56, "Play"); add(7, 76, height - 28, 52, "Pause");
-        add(8, 132, height - 28, 44, "Stop"); add(9, 180, height - 28, 44, "Next");
-        add(3, width - 72, height - 28, 56, "Done");
+        add(6, 16, height - 28, 44, "Play"); add(7, 64, height - 28, 44, "Pause");
+        add(8, 112, height - 28, 36, "Stop"); add(9, 152, height - 28, 36, "Next");
+        add(18, 192, height - 28, 64, player.label(18));
+        add(3, width - 60, height - 28, 44, "Done");
         if (width >= 460) {
             add(10, 10, 72, 108, "Music"); add(11, 10, 98, 108, "Soundtrack"); add(12, 10, 124, 108, "Long audio");
         }
@@ -44,18 +45,18 @@ public final class SelectorScreen extends Screen implements PlayerView.Canvas {
         Button button = new PlayerButton(id, x, y, w, label);
         controls.put(id, button); addRenderableWidget(button);
     }
-    private void act(int id) { if (id == 3) onClose(); else { player.query = search.getValue(); player.playlistName = playlistName.getValue(); player.action(id); } }
+    private void act(int id) { if (id == 3) onClose(); else { player.query = search.getValue(); player.playlistName = playlistName.getValue(); player.action(id); if (id == 18) { search.setValue(player.query); search.setFocused(true); } } }
     @Override public void render(GuiGraphics graphics, int x, int y, float partial) {
         this.graphics = graphics;
         player.query = search.getValue();
         player.draw(this, x, y);
         for (Map.Entry<Integer, Button> entry : controls.entrySet()) {
             int id = entry.getKey(); Button button = entry.getValue();
-            if (id == 4 || id == 5 || id == 7 || id == 13 || id == 15 || id == 16 || id == 17) button.setMessage(Component.literal(player.label(id)));
+            if (id == 4 || id == 5 || id == 7 || id == 9 || id == 13 || id == 15 || id == 16 || id == 17 || id == 18) button.setMessage(Component.literal(player.label(id)));
             button.active = player.available(id);
         }
         super.render(graphics, x, y, partial);
-        if (search.getValue().length() == 0 && !search.isFocused()) text("Search tracks or source", player.left()+4, 70, width-player.left()-24, 0xff8094a8);
+        if (search.getValue().length() == 0 && !search.isFocused()) text(player.editingNickname ? "Nickname (empty clears)" : "Search tracks or source", player.left()+4, 70, width-player.left()-24, 0xff8094a8);
         if (playlistName.getValue().length() == 0 && !playlistName.isFocused()) text("New name", player.left()+98, 44, 68, 0xff8094a8);
         this.graphics = null;
     }
