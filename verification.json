@@ -18,7 +18,13 @@
     "{package_path}/domain/Library.class",
     "{package_path}/domain/ListView.class",
     "{package_path}/domain/FieldAccess.class",
-    "{package_path}/domain/PlayerView.class"
+    "{package_path}/domain/PlayerView.class",
+    "{package_path}/domain/Discovery.class",
+    "{package_path}/domain/ResourceFiles.class",
+    "{package_path}/domain/Appearance.class",
+    "{package_path}/domain/GuiTheme.class",
+    "{package_path}/domain/PlayerLayout.class",
+    "{package_path}/domain/PlayerRenderer.class"
   ],
   "class_roots": [
     "{package_path}/"
@@ -26,7 +32,17 @@
   "resource_roots": [
     "assets/{mod_id}/"
   ],
-  "required_assets": [],
+  "required_assets": [
+    "assets/{mod_id}/textures/gui/classic/dark.png",
+    "assets/{mod_id}/textures/gui/classic/light.png",
+    "assets/{mod_id}/textures/gui/modern/dark.png",
+    "assets/{mod_id}/textures/gui/modern/light.png",
+    "assets/{mod_id}/textures/gui/common/disc.png",
+    "assets/{mod_id}/textures/gui/icons/dark.png",
+    "assets/{mod_id}/textures/gui/icons/light.png",
+    "assets/{mod_id}/textures/gui/icons/artwork.png",
+    "assets/{mod_id}/textures/gui/common/tonearm.png"
+  ],
   "metadata_profiles": {
     "legacy": {
       "path": "mcmod.info",
@@ -309,10 +325,10 @@
           {
             "class": "{package_path}/ClientAdapter.class",
             "present": [
-              "m_91098_"
+              "m_91099_"
             ],
             "absent": [
-              "getResourceManager"
+              "getResourcePackRepository"
             ]
           }
         ]
@@ -345,10 +361,10 @@
           {
             "class": "{package_path}/ClientAdapter.class",
             "present": [
-              "m_91098_"
+              "m_91099_"
             ],
             "absent": [
-              "getResourceManager"
+              "getResourcePackRepository"
             ]
           }
         ]

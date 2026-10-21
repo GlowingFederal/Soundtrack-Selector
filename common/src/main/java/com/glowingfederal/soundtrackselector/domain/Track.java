@@ -11,6 +11,8 @@ public final class Track {
     public final String searchText;
     public final double seconds;
     public final boolean music;
+    public final int artwork;
+    public final String disc;
     private final String alias;
 
     public Track(String id, String event, double seconds) {
@@ -22,6 +24,16 @@ public final class Track {
         this.event = event;
         this.seconds = seconds;
         this.music = musicHint(id) || musicHint(event);
+        String hint = (id + " " + event).toLowerCase(Locale.ROOT);
+        String record = null;
+        if (id.startsWith("minecraft:") && (hint.contains("record") || hint.contains("disc"))) {
+            String leaf = id.substring(id.lastIndexOf('/') + 1).replace(".ogg", "");
+            for (String known : new String[]{"13","cat","blocks","chirp","far","mall","mellohi","stal","strad","ward","11","wait","pigstep","otherside","5","relic","creator","creator_music_box","precipice","tears","lava_chicken"})
+                if (leaf.equals(known)) { record = known; break; }
+        }
+        disc = record;
+        artwork = record != null ? 5 : hint.contains("nether") ? 2 : hint.contains("end/") || hint.contains(".end") ? 3
+                : hint.contains("menu") ? 4 : id.startsWith("minecraft:") && music ? 1 : music ? 0 : 6;
         this.namespace = id.substring(0, id.indexOf(':'));
         String path = id.substring(id.indexOf(':') + 1).replaceFirst("^(sounds|sound|music|records)/", "")
                 .replaceFirst("\\.ogg$", "");

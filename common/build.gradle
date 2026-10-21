@@ -6,7 +6,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_1_8
 }
 repositories { mavenCentral() }
-dependencies { compileOnly 'com.google.code.gson:gson:2.2.4'; testImplementation 'junit:junit:4.13.2' }
+dependencies { compileOnly 'com.google.code.gson:gson:2.2.4'; testImplementation 'junit:junit:4.13.2'; testRuntimeOnly 'com.google.code.gson:gson:2.2.4' }
 compileJava { options.release = 8; options.encoding = 'UTF-8' }
 compileTestJava { options.release = 8; options.encoding = 'UTF-8' }
 tasks.withType(JavaCompile).configureEach {

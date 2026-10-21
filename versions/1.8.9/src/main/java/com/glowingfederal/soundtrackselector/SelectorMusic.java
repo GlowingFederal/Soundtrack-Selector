@@ -43,7 +43,7 @@ final class SelectorMusic extends MusicTicker implements Library.Playback {
         }
         if (sound != null) mc.getSoundHandler().stopSound(sound);
         world = mc.theWorld; paused = false; grace = 40;
-        sound = PositionedSoundRecord.create(ClientAdapter.nativeTracks.get(track.id)); selected = track;
+        sound = PositionedSoundRecord.create(ClientAdapter.nativeTrack(track)); selected = track;
         mc.getSoundHandler().playSound(sound);
         ClientAdapter.library.played(track);
     }

@@ -55,13 +55,24 @@ public final class Catalog {
         cursor = 0;
     }
 
-    public void replace(Collection<Track> discovered) {
-        List<Track> sorted = new ArrayList<Track>(discovered);
-        Collections.sort(sorted, new Comparator<Track>() {
-            public int compare(Track a, Track b) { return a.id.compareTo(b.id); }
-        });
-        tracks = Collections.unmodifiableList(sorted);
+    public void replace(List<Track> discovered) {
+        Track[] previous = order;
+        int consumed = cursor;
+        tracks = discovered;
         rebuild();
+        if (previous == null) return;
+        // Keep the in-flight pass, including consumed tracks, across a library refresh.
+        Map<String, Track> remaining = new LinkedHashMap<String, Track>();
+        for (Track track : enabled) remaining.put(track.id, track);
+        List<Track> retained = new ArrayList<Track>();
+        int retainedCursor = 0;
+        for (int i = 0; i < previous.length; i++) {
+            Track track = remaining.remove(previous[i].id);
+            if (track != null) { retained.add(track); if (i < consumed) retainedCursor++; }
+        }
+        retained.addAll(remaining.values());
+        order = retained.toArray(new Track[retained.size()]);
+        cursor = retainedCursor;
     }
 
     public void refresh() { rebuild(); }

@@ -20,17 +20,35 @@ public final class Library {
         void release();
     }
     public Playback playback;
+    public final Appearance appearance;
+    private final Deque<Track> history = new ArrayDeque<Track>();
+    private Track lastPlayed;
+    private boolean goingBack;
     private long started, pausedAt;
     private boolean custom;
     public boolean custom() { return custom; }
-    public void played(Track track) { custom = true; started = System.nanoTime(); pausedAt = 0; }
+    public void played(Track track) {
+        if (!goingBack && lastPlayed != null && !lastPlayed.id.equals(track.id)) {
+            if (history.size() == 64) history.removeFirst();
+            history.addLast(lastPlayed);
+        }
+        lastPlayed = track;
+        custom = true; started = System.nanoTime(); pausedAt = 0;
+    }
+    public boolean hasPrevious() { return custom && !history.isEmpty(); }
+    public void previous() {
+        if (playback == null || !hasPrevious()) return;
+        Track track = history.removeLast();
+        goingBack = true;
+        try { play(track); } finally { goingBack = false; }
+    }
     public void play(Track track) {
         if (playback == null || track == null) return;
         catalog.begin(track, playerRandom);
         playback.play(track);
     }
-    public void relinquished() { custom = false; }
-    public void stop() { if (playback != null) playback.stop(); custom = false; catalog.preferences.returnToVanilla(); catalog.refresh(); save(); }
+    public void relinquished() { custom = false; history.clear(); lastPlayed = null; }
+    public void stop() { if (playback != null) playback.stop(); relinquished(); catalog.preferences.returnToVanilla(); catalog.refresh(); save(); }
     public void next() {
         if (playback == null) return;
         Track track = catalog.next(playerRandom);
@@ -58,6 +76,7 @@ public final class Library {
         playback.release();
     }
     public double elapsed() { return Math.max(0, ((pausedAt == 0 ? System.nanoTime() : pausedAt) - started) / 1000000000.0); }
+    public Log log() { return log; }
     public final Catalog catalog;
     private final Log log;
     public String status = "Waiting for sound resources";
@@ -65,6 +84,7 @@ public final class Library {
 
     public Library(File directory, Log log, String target, Collection<String> vanillaEvents) {
         this.log = log;
+        appearance = new Appearance(directory, log);
         File file = new File(directory, "soundtrackselector.json");
         Preferences preferences;
         try { preferences = new Preferences(file); }
@@ -82,18 +102,57 @@ public final class Library {
         } catch (IOException failure) { log.warning("Cannot maintain Vanilla recovery configuration", failure); }
     }
 
-    public void discover(Map<String, String> files, Resources resources) {
-        discover(files, resources, Collections.<String, String>emptyMap());
+    private final Discovery discovery = new Discovery();
+    private boolean refreshRequested;
+    public void requestRefresh() { refreshRequested = true; }
+    public boolean takeRefreshRequest() { if (discovery.busy()) return false; boolean value = refreshRequested; refreshRequested = false; return value; }
+    public void invalidateDiscovery() { discovery.invalidate(); }
+    public boolean discovering() { return discovery.busy(); }
+    public void submit(Discovery.Scan scan) {
+        refreshRequested = false;
+        status = "Discovering audio...";
+        discovery.submit(scan);
     }
-    public void discover(Map<String, String> files, Resources resources, Map<String, String> aliases) {
+    /** Client-thread publication uses the latest preferences, never a worker copy. */
+    public void pollDiscovery() {
+        synchronized (discovery) {
+            Discovery.Completion completion = discovery.poll();
+            if (completion == null) return;
+            if (completion.failure != null) {
+                status = "Discovery failed; refresh to retry (see log)";
+                log.warning("Cannot discover soundtrack resources", completion.failure);
+                return;
+            }
+            long start = System.nanoTime();
+            catalog.replace(completion.result.tracks);
+            completion.scan.published();
+            status = completion.result.status;
+            log.info("Soundtrack Selector client publication: " + (System.nanoTime() - start) / 1000000.0 + " ms");
+        }
+    }
+
+    public static final class Result {
+        public final List<Track> tracks;
+        public final String status;
+        Result(List<Track> tracks, String status) {
+            this.tracks = Collections.unmodifiableList(new ArrayList<Track>(tracks));
+            this.status = status;
+        }
+    }
+    public Result inspect(Map<String, String> files, Resources resources) throws IOException {
+        return inspect(files, resources, Collections.<String, String>emptyMap());
+    }
+    public Result inspect(Map<String, String> files, Resources resources, Map<String, String> aliases) throws IOException {
+        long start = System.nanoTime();
         List<Track> tracks = new ArrayList<Track>();
         Set<String> namespaces = new HashSet<String>();
         int musicCount = 0;
         int shortCount = 0;
         int failures = 0;
         for (Map.Entry<String, String> file : files.entrySet()) {
+            Discovery.checkCancelled();
             try {
-                InputStream input = resources.open(file.getKey());
+                InputStream input = new BufferedInputStream(resources.open(file.getKey()));
                 double duration;
                 try { duration = OggDuration.read(input); } finally { input.close(); }
                 if (duration > 10.0) {
@@ -105,6 +164,7 @@ public final class Library {
                     namespaces.add(track.namespace);
                 } else shortCount++;
             } catch (IOException failure) {
+                Discovery.checkCancelled();
                 failures++;
                 log.debug("Skipping unreadable soundtrack resource " + file.getKey(), failure);
             } catch (RuntimeException failure) {
@@ -112,10 +172,13 @@ public final class Library {
                 log.debug("Skipping invalid soundtrack resource " + file.getKey(), failure);
             }
         }
-        catalog.replace(tracks);
-        status = musicCount + " music tracks; " + (tracks.size() - musicCount) + " other long audio";
+        Collections.sort(tracks, new Comparator<Track>() {
+            public int compare(Track a, Track b) { return a.id.compareTo(b.id); }
+        });
+        String summary = musicCount + " music tracks; " + (tracks.size() - musicCount) + " other long audio";
         log.info("Soundtrack Selector discovered " + tracks.size() + " resources longer than 10s (" + musicCount + " music candidates) from " + namespaces.size()
-                + " namespaces; " + shortCount + " short sounds ignored; " + failures + " unreadable resources skipped.");
+                + " namespaces; " + shortCount + " short sounds ignored; " + failures + " unreadable resources skipped; metadata " + (System.nanoTime() - start) / 1000000.0 + " ms.");
+        return new Result(tracks, summary);
     }
 
     public void save() {

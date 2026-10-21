@@ -19,13 +19,12 @@ public final class ClientAdapter extends CommonProxy {
     static final Logger LOG = LogManager.getLogger("Soundtrack Selector");
     static Library library;
     static final KeyBinding OPEN = new KeyBinding("key.soundtrackselector.open", Keyboard.KEY_M, "key.categories.soundtrackselector");
-    static final Map<String, ResourceLocation> nativeTracks = new HashMap<String, ResourceLocation>();
     private static Collection<String> vanillaEvents() {
         List<String> events = new ArrayList<String>();
         for (MusicTicker.MusicType type : MusicTicker.MusicType.values()) events.add(type.getMusicLocation().toString());
         return events;
     }
-    private volatile boolean reload = true;
+    private final java.util.concurrent.atomic.AtomicBoolean reload = new java.util.concurrent.atomic.AtomicBoolean(true);
     private SelectorMusic music;
     @Override public void init() {
         Minecraft mc = Minecraft.getMinecraft();
@@ -36,7 +35,7 @@ public final class ClientAdapter extends CommonProxy {
         }, "1.8.9", vanillaEvents());
         ClientRegistry.registerKeyBinding(OPEN);
         ((IReloadableResourceManager) mc.getResourceManager()).registerReloadListener(new IResourceManagerReloadListener() {
-            @Override public void onResourceManagerReload(IResourceManager manager) { reload = true; }
+            @Override public void onResourceManagerReload(IResourceManager manager) { if (library != null) library.invalidateDiscovery(); reload.set(true); }
         });
         FMLCommonHandler.instance().bus().register(this);
     }
@@ -48,27 +47,15 @@ public final class ClientAdapter extends CommonProxy {
             library.playback = music;
         }
         music.checkOwnership();
-        if (reload) { reload = false; library.stop(); discover(mc); }
+        if (reload.getAndSet(false) || library.takeRefreshRequest()) discover(mc);
+        library.pollDiscovery();
         while (OPEN.isPressed()) if (mc.currentScreen == null) mc.displayGuiScreen(new SelectorScreen(null));
     }
     private void discover(final Minecraft mc) {
-        final IResourceManager manager = mc.getResourceManager();
-        SoundDefinitions definitions = new SoundDefinitions();
-        for (Object domain : manager.getResourceDomains()) {
-            String namespace = domain.toString();
-            List<IResource> resources;
-            try { resources = manager.getAllResources(new ResourceLocation(namespace, "sounds.json")); }
-            catch (IOException missing) { continue; }
-            for (IResource resource : resources) {
-                try {
-                    Reader reader = new InputStreamReader(resource.getInputStream(), "UTF-8");
-                    try { definitions.add(namespace, reader); } finally { reader.close(); }
-                } catch (IOException failure) { LOG.debug("Cannot read sounds.json in " + namespace, failure); }
-                catch (RuntimeException failure) { LOG.debug("Invalid sounds.json in " + namespace, failure); }
-            }
-        }
-        Map<String, String> files = definitions.files();
-        Map<String, String> aliases = definitions.aliasIds();
+        long start = System.nanoTime();
+        final ResourceFiles resources = snapshot(mc.getResourceManager());
+        final Map<String, String> registeredFiles = new TreeMap<String, String>();
+        final Map<String, String> registeredAliases = new HashMap<String, String>();
         SoundRegistry nativeRegistry = (SoundRegistry) FieldAccess.get(FieldAccess.unique(SoundHandler.class, SoundRegistry.class), mc.getSoundHandler());
         Map<?, ?> registered = (Map<?, ?>) FieldAccess.get(FieldAccess.unique(SoundRegistry.class, Map.class), nativeRegistry);
         java.lang.reflect.Field list = FieldAccess.unique(SoundEventAccessorComposite.class, List.class);
@@ -82,29 +69,58 @@ public final class ClientAdapter extends CommonProxy {
                 if (entry instanceof SoundEventAccessor) {
                     SoundPoolEntry sound = (SoundPoolEntry) FieldAccess.get(file, entry);
                     String resource = sound.getSoundPoolEntryLocation().toString();
-                    if (!files.containsKey(resource)) {
-                        files.put(resource, accessor.getSoundEventLocation().toString());
-                        aliases.put(resource, accessor.getSoundEventLocation().toString() + "#" + index);
+                    if (!registeredFiles.containsKey(resource)) {
+                        registeredFiles.put(resource, accessor.getSoundEventLocation().toString());
+                        registeredAliases.put(resource, accessor.getSoundEventLocation().toString() + "#" + index);
                     }
                 }
             }
         }
-        library.discover(files, new Library.Resources() {
-            public InputStream open(String id) throws IOException { return manager.getResource(new ResourceLocation(id)).getInputStream(); }
-        }, aliases);
+        library.submit(new Discovery.Scan() {
+            public Library.Result run() throws Exception {
+                try {
+                    SoundDefinitions definitions = resources.definitions(library.log());
+                    Map<String, String> files = definitions.files();
+                    Map<String, String> aliases = definitions.aliasIds();
+                    for (Map.Entry<String, String> entry : registeredFiles.entrySet()) if (!files.containsKey(entry.getKey())) {
+                        files.put(entry.getKey(), entry.getValue()); aliases.put(entry.getKey(), registeredAliases.get(entry.getKey()));
+                    }
+                    return library.inspect(files, resources, aliases);
+                } finally { resources.close(); }
+            }
+            public void published() {}
+        });
+        LOG.info("Soundtrack Selector client snapshot/submission: " + (System.nanoTime() - start) / 1000000.0 + " ms");
+    }
+    /** Native streaming entry creation is constant work, only for the track being played. */
+    static ResourceLocation nativeTrack(final Track track) {
+        Minecraft mc = Minecraft.getMinecraft();
         SoundRegistry registry = (SoundRegistry) FieldAccess.get(FieldAccess.unique(SoundHandler.class, SoundRegistry.class), mc.getSoundHandler());
-        nativeTracks.clear();
-        int index = 0;
-        for (Track track : library.catalog.tracks()) {
-            ResourceLocation id = new ResourceLocation("soundtrackselector", "track/" + index++);
-            final SoundPoolEntry entry = new SoundPoolEntry(new ResourceLocation(track.id), 1.0, 1.0, true);
-            SoundEventAccessorComposite accessor = new SoundEventAccessorComposite(id, 1.0, 1.0, SoundCategory.MUSIC) {
-                @Override public int getWeight() { return 1; }
-                @Override public SoundPoolEntry cloneEntry() { return new SoundPoolEntry(entry); }
-            };
-            registry.registerSound(accessor);
-            nativeTracks.put(track.id, id);
+        ResourceLocation id = new ResourceLocation("soundtrackselector", "selected");
+        final SoundPoolEntry entry = new SoundPoolEntry(new ResourceLocation(track.id), 1.0, 1.0, true);
+        SoundEventAccessorComposite accessor = new SoundEventAccessorComposite(id, 1.0, 1.0, SoundCategory.MUSIC) {
+            @Override public int getWeight() { return 1; }
+            @Override public SoundPoolEntry cloneEntry() { return new SoundPoolEntry(entry); }
+        };
+        registry.registerSound(accessor);
+        return id;
+    }
+    /** Copy pack descriptors only: the worker never calls a live Minecraft resource manager. */
+    @SuppressWarnings("unchecked")
+    private ResourceFiles snapshot(IResourceManager manager) {
+        ResourceFiles result = new ResourceFiles();
+        Map<?, ?> domains = (Map<?, ?>) FieldAccess.get(FieldAccess.unique(SimpleReloadableResourceManager.class, Map.class), manager);
+        java.lang.reflect.Field list = FieldAccess.unique(FallbackResourceManager.class, List.class);
+        for (Map.Entry<?, ?> domain : domains.entrySet()) for (IResourcePack pack : (List<IResourcePack>) FieldAccess.get(list, domain.getValue())) {
+            if (pack instanceof DefaultResourcePack) {
+                result.add(domain.getKey().toString(), (Map<?, ?>) FieldAccess.get(FieldAccess.unique(DefaultResourcePack.class, Map.class), pack), DefaultResourcePack.class);
+            } else if (pack instanceof AbstractResourcePack) {
+                result.add(domain.getKey().toString(), (File) FieldAccess.get(FieldAccess.unique(AbstractResourcePack.class, File.class), pack));
+            } else {
+                result.add(domain.getKey().toString(), Collections.emptyMap(), pack.getClass());
+                LOG.warn("Soundtrack Selector can only inspect classpath audio for opaque resource pack " + pack.getClass().getName());
+            }
         }
-
+        return result;
     }
 }

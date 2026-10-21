@@ -16,6 +16,7 @@ public final class OggDuration {
         byte[] identification = new byte[30];
         Map<Long, Stream> streams = new HashMap<Long, Stream>();
         while (true) {
+            Discovery.checkCancelled();
             int first = input.read();
             if (first < 0) break;
             header[0] = (byte) first;

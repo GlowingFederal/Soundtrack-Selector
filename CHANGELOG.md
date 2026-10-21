@@ -51,3 +51,24 @@
 - Generate native-category Vanilla definitions and recovery copies automatically, including when user preferences are unreadable. Reconstruct built-in data instead of trusting saved catalog contents; preserve damaged user files.
 - Migrate existing playlist formats to format 3 while retaining explicit selections and missing resources. Keep a user playlist named Vanilla separate; new discovered tracks require explicit custom-playlist selection.
 - Add editable, searchable track nicknames with clearing, immediate persistence and original identifiers in the UI. Use sound-event definition slots to distinguish pooled variants and retain names through resource replacement; fall back to resource identity where legacy pools provide no usable event.
+
+2026-10-20 02:16 — Move audio discovery off the client tick
+
+- Run pack enumeration, sound-definition parsing and buffered Ogg duration inspection on one bounded background worker across all eight targets. Publish complete immutable results on the client thread using current playlist preferences.
+- Keep Vanilla playback independent of discovery, preserve active custom audio and its current playlist pass during library refresh, and create 1.7.10/1.8.9 private streaming entries only for the selected track.
+- Add a nonblocking discovery indicator and Refresh beside Search. Coalesce repeated refresh requests, cancel invalidated generations and interrupt discovery at shutdown; ordinary screen transitions do not rescan the library.
+- Use independent legacy file/index descriptors and worker-owned modern pack managers to isolate resource I/O from the client and sound engine. Preserve strict duration filtering, saved choices and nicknames.
+- Legacy opaque packs are inspected through classpath resources and concrete file/jar pool URLs rather than shared mutable game resource APIs; dynamically generated audio requires an independent source.
+
+2026-10-20 14:40 — Redesign the player with Classic and Modern themes
+
+- Replace the technical selector presentation across all eight targets with a framed pixel-art Classic player and a compact Modern player, each with complete light/dark skin atlases, reusable icons, track category artwork and native vanilla-disc texture fallbacks. Collapse optional navigation/artwork regions at smaller GUI scales.
+- Add an in-screen Appearance menu with immediate style/mode changes and reduced animations, persisted separately from soundtrack data through a serial background writer. Keep playback ownership, playlist data, search, selection, scroll and asynchronous discovery independent of theme changes.
+- Animate a textured music record from the existing pause-aware playback clock, with a stationary pickup arm drawn in front; retain honest read-only elapsed progress. Add bounded Previous history and native Minecraft Music volume controls while preserving Play, Start/Next, Pause, Stop/Vanilla restoration, Loop, Random, nicknames and playlist management.
+- Add draggable clipped scrolling, visible focus, keyboard navigation, icon tooltips and distinct selected/enabled/playing states. Add shared regression coverage for layout bounds, interaction semantics, theme isolation, history, artwork fallback, dragging and appearance persistence; require theme classes and textures in every production archive.
+- Use shadow-free text and input presentation in light themes, retaining native editing/selection behavior and strengthening selected/disabled text contrast.
+
+2026-10-21 02:35 — Keep playlists playing when the selector closes
+
+- Remove playback release from selector close handlers across all eight targets. Closing the menu now preserves the current custom track, playlist progress, playback history and pause state instead of stopping playback and returning to Vanilla.
+- Retain GUI input cleanup and preference saving on close; explicit Stop and existing playback lifecycle rules still restore Vanilla.

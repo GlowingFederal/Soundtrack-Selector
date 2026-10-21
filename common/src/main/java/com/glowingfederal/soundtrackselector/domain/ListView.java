@@ -12,6 +12,7 @@ public final class ListView {
     public int offset;
     public Track selected;
     public ListView(Catalog catalog) { this.catalog = catalog; }
+    public int filterIndex() { return filter; }
     public String filterLabel() { return filter == 0 ? "Music" : filter == 1 ? "Soundtrack" : "Long audio"; }
     public String sortLabel() { return sort == 0 ? "Name" : sort == 1 ? "Source" : "Length"; }
     public void cycleFilter() { filter = (filter + 1) % 3; revision = -1; offset = 0; }

@@ -2,30 +2,57 @@ package com.glowingfederal.soundtrackselector.domain;
 
 import java.util.List;
 
-/** Platform-neutral layout and actions; adapters provide native text, buttons and input. */
+/** Interaction state only. PlayerRenderer and GuiTheme own presentation; adapters own native APIs. */
 public final class PlayerView {
     public interface Canvas {
         void rectangle(int left, int top, int right, int bottom, int color);
         void text(String value, int x, int y, int availableWidth, int color);
+        int textWidth(String value);
+        void texture(String resource, int x,int y,int width,int height,int u,int v,int regionWidth,int regionHeight,int textureWidth,int textureHeight,float degrees);
+        void clip(int x,int y,int width,int height);
+        void unclip();
+        boolean disc(String name,int x,int y,int size);
+        float musicVolume();
+        void musicVolume(float value,boolean save);
     }
     public final ListView list;
-    private final Library library;
-    public int width, height;
-    public String query = "";
-    public String playlistName = "";
-    public boolean editingNickname;
-    private String previousQuery;
+    final Library library;
+    public PlayerLayout layout;
+    public GuiTheme theme;
+    public int width,height;
+    public String query="",playlistName="";
+    public boolean editingNickname,settingsOpen;
+    public int focusControl=-1;
+    private String previousQuery,clickedTrack;
     private Track nicknameTrack;
-    private boolean deleteArmed;
-    private String clickedTrack;
+    private boolean deleteArmed,draggingScroll,draggingVolume;
+    private int scrollGrab;
     private long clickedAt;
-    public PlayerView(Library library) { this.library = library; list = new ListView(library.catalog); }
-    public int left() { return width >= 460 ? 144 : 16; }
-    private boolean compact() { return height < 300; }
-    public int visible() { return Math.max(1, (height - (compact() ? 180 : 212)) / 26); }
-    public List<Track> rows() { List<Track> rows = list.rows(editingNickname ? previousQuery : query); list.clamp(visible()); return rows; }
+    private final PlayerRenderer renderer = new PlayerRenderer();
+    public PlayerView(Library library) { this.library=library; list=new ListView(library.catalog); }
+    public void resize(int width,int height) {
+        this.width=width; this.height=height;
+        layout=new PlayerLayout(width,height,library.appearance.modern);
+        theme=new GuiTheme(library.appearance);
+    }
+    public int left() { return layout.library.x; }
+    public int visible() { return Math.max(1,layout.library.h/layout.rowHeight); }
+    public List<Track> rows() { List<Track> rows=list.rows(editingNickname?previousQuery:query); list.clamp(visible()); return rows; }
+    public boolean shown(int id) { return layout.buttons[id]!=null && (settingsOpen?id>=21&&id<=24:id<=20); }
+    public boolean selected(int id) {
+        return id>=10&&id<=12?list.filterIndex()==id-10:id==16?library.catalog.preferences.loop():id==17&&library.catalog.preferences.randomOrder();
+    }
     public void action(int id) {
         clickedTrack = null;
+        if (id == 20 || id == 24) { settingsOpen = !settingsOpen; return; }
+        if (id >= 21 && id <= 23) {
+            if (id == 21) library.appearance.modern = !library.appearance.modern;
+            if (id == 22) library.appearance.light = !library.appearance.light;
+            if (id == 23) library.appearance.reducedMotion = !library.appearance.reducedMotion;
+            library.appearance.save(); resize(width,height); return;
+        }
+        if (id == 0) { library.previous(); return; }
+        if (id == 19) { library.requestRefresh(); return; }
         if (id == 18) {
             if (editingNickname) {
                 library.rename(nicknameTrack, query); query = previousQuery; editingNickname = false;
@@ -51,26 +78,23 @@ public final class PlayerView {
         if (id == 17) library.toggleRandomOrder();
         if (id >= 10 && id <= 12) list.filter(id - 10);
     }
-    public boolean click(double x, double y) {
-        if (editingNickname) return false;
-        if (x < left() || x >= width - 16 || y < 118 || y >= 118 + visible() * 26) { clickedTrack = null; return false; }
-        List<Track> rows = rows();
-        int index = list.offset + (int) ((y - 118) / 26);
-        if (index >= rows.size()) { clickedTrack = null; return false; }
-        Track track = rows.get(index);
-        list.selected = track;
-        if (x < left() + 28) { clickedTrack = null; library.toggle(track); }
-        else {
-            long now = System.nanoTime();
-            if (track.id.equals(clickedTrack) && now - clickedAt <= 250000000L) {
-                clickedTrack = null;
-                library.play(track);
-            } else { clickedTrack = track.id; clickedAt = now; }
-        }
-        return true;
-    }
-    public void scroll(int delta) { clickedTrack = null; rows(); int step = Math.min(Math.abs(delta), visible()); list.scroll(delta < 0 ? -step : step, visible()); }
     public String label(int id) {
+        if (id == 0) return "Previous";
+        if (id == 3) return "Done";
+        if (id == 6) return "Play selected";
+        if (id == 8) return "Stop";
+        if (id == 1) return "All on";
+        if (id == 2) return "All off";
+        if (id == 10) return "Music";
+        if (id == 11) return "Soundtrack";
+        if (id == 12) return "Long audio";
+        if (id == 14) return "New";
+        if (id == 19) return "Refresh";
+        if (id == 20) return "Appearance";
+        if (id == 21) return "Style: " + (library.appearance.modern ? "Modern" : "Classic");
+        if (id == 22) return "Appearance: " + (library.appearance.light ? "Light" : "Dark");
+        if (id == 23) return "Reduced animations: " + (library.appearance.reducedMotion ? "On" : "Off");
+        if (id == 24) return "Back";
         if (id == 18) return editingNickname ? "Save name" : "Nickname";
         if (id == 9) return library.custom() ? "Next" : "Start";
         if (id == 13) return library.catalog.preferences.activePlaylist();
@@ -83,6 +107,8 @@ public final class PlayerView {
         return "";
     }
     public boolean available(int id) {
+        if (id >= 20) return true;
+        if (id == 0) return !editingNickname && library.hasPrevious();
         if (id == 18) return editingNickname || list.selected != null;
         if (editingNickname && id != 3) return false;
         if (id == 1 || id == 2) return !library.catalog.preferences.vanilla();
@@ -93,54 +119,54 @@ public final class PlayerView {
         if (id == 9) return library.playback != null && library.catalog.hasEnabled();
         return true;
     }
-    public void draw(Canvas c, int mouseX, int mouseY) {
-        c.rectangle(0, 0, width, height, 0xff0b1118);
-        int left = left(), right = width - 16;
-        if (width >= 460) {
-            c.rectangle(0, 0, 128, height - 80, 0xff111d29);
-            c.text("SOUNDTRACK", 14, 17, 104, 0xff7ce6b5);
-            c.text("SELECTOR", 14, 30, 104, 0xffffffff);
-            c.text("LIBRARY VIEWS", 14, 54, 104, 0xff8094a8);
-            if (!compact()) c.text(library.catalog.enabledCount() + " enabled", 14, height - 111, 104, 0xff7ce6b5);
-            if (!compact()) c.text("Music volume applies", 14, height - 99, 104, 0xff8094a8);
+    public boolean click(double x,double y,Canvas canvas) {
+        if(settingsOpen)return true;
+        if(layout.volume.contains(x,y)) { draggingVolume=true; drag(x,y,canvas); return true; }
+        PlayerLayout.Box b=layout.library;
+        if(x>=b.x+b.w-8&&x<b.x+b.w&&y>=b.y&&y<b.y+b.h&&rows().size()>visible()) {
+            draggingScroll=true; int thumb=thumbHeight(),top=thumbTop();
+            scrollGrab=y>=top&&y<top+thumb?(int)y-top:thumb/2;
+            drag(x,y,canvas);return true;
         }
-        c.text("Soundtrack Selector", left, 13, width - 168 - left, 0xffffffff);
-        c.text(library.catalog.preferences.playlistCount() + " playlists / " + library.status, left, 26, right - left, 0xff8094a8);
-        List<Track> rows = rows();
-        for (int i = 0; i < visible() && list.offset + i < rows.size(); i++) {
-            Track track = rows.get(list.offset + i);
-            int top = 118 + i * 26;
-            boolean selected = list.selected != null && list.selected.id.equals(track.id);
-            boolean hovered = mouseX >= left && mouseX < right && mouseY >= top && mouseY < top + 24;
-            boolean enabled = library.catalog.preferences.enabled(track);
-            c.rectangle(left, top, right, top + 24, selected ? 0xff243c4d : hovered ? 0xff1b2b3b : 0xff131f2c);
-            if (selected) c.rectangle(left, top, left + 2, top + 24, 0xff7ce6b5);
-            c.rectangle(left + 8, top + 8, left + 20, top + 20, enabled ? 0xff7ce6b5 : 0xff425568);
-            c.text(enabled ? "+" : "-", left + 11, top + 10, 9, enabled ? 0xff10231d : 0xffc6d4e0);
-            c.text(library.catalog.preferences.displayName(track), left + 30, top + 4, right - left - 76, 0xffeef4fa);
-            c.text(track.event, left + 30, top + 16, right - left - 76, 0xff8094a8);
-            c.text(track.durationText(), right - 42, top + 10, 38, 0xffc6d4e0);
+        if(editingNickname||!b.contains(x,y)) { clickedTrack=null;return false; }
+        List<Track> rows=rows();
+        int index=list.offset+(int)((y-b.y)/layout.rowHeight);
+        if(index>=rows.size()) { clickedTrack=null;return false; }
+        Track track=rows.get(index); list.selected=track;
+        if(x<b.x+23) { clickedTrack=null;library.toggle(track); }
+        else {
+            long now=System.nanoTime();
+            if(track.id.equals(clickedTrack)&&now-clickedAt<=250000000L) { clickedTrack=null;library.play(track); }
+            else { clickedTrack=track.id;clickedAt=now; }
         }
-        if (rows.isEmpty()) c.text("No matching tracks. Try Long audio or another search.", left, 122, right - left, 0xff8094a8);
-        int trackHeight = visible() * 26;
-        if (rows.size() > visible()) {
-            int thumb = Math.max(8, trackHeight * visible() / rows.size());
-            int top = 118 + (trackHeight - thumb) * list.offset / Math.max(1, rows.size() - visible());
-            c.rectangle(right + 5, 118, right + 7, 92 + trackHeight, 0xff243747);
-            c.rectangle(right + 5, top, right + 7, top + thumb, 0xff7ce6b5);
-        }
-        if (!compact()) c.text(rows.size() + " in view / " + library.catalog.enabledCount() + " enabled | All on/off: this view", left, height - 92, right - left, 0xff8094a8);
-        c.rectangle(0, height - (compact() ? 60 : 80), width, height, 0xff111d29);
-        c.rectangle(0, height - (compact() ? 60 : 80), width, height - (compact() ? 59 : 79), 0xff2c4254);
-        Track playing = library.playback == null ? null : library.playback.current();
-        Track details = list.selected;
-        if (!compact()) c.text(details == null ? "Select a track, then Play, or double-click to listen" : "Selected: " + library.catalog.preferences.displayName(details) + " / " + details.id, 16, height - 71, width - 32, 0xffc6d4e0);
-        c.text(playing == null ? "VANILLA   Minecraft controls music" : (library.playback.paused() ? "PAUSED   " : "NOW PLAYING   ") + library.catalog.preferences.displayName(playing) + " / " + playing.namespace,
-                16, height - 56, width - 32, 0xff7ce6b5);
-        c.rectangle(16, height - 40, width - 16, height - 37, 0xff2c4254);
-        if (playing != null) {
-            int progress = (int) ((width - 32) * Math.min(1.0, library.elapsed() / playing.seconds));
-            c.rectangle(16, height - 40, 16 + progress, height - 37, 0xff7ce6b5);
-        }
+        return true;
     }
+    public int thumbHeight() { return Math.max(12,layout.library.h*visible()/Math.max(1,rows().size())); }
+    public int thumbTop() { return layout.library.y+(layout.library.h-thumbHeight())*list.offset/Math.max(1,rows().size()-visible()); }
+    public boolean drag(double x,double y,Canvas c) {
+        if(draggingVolume) { c.musicVolume((float)Math.max(0,Math.min(1,(x-layout.volume.x)/(layout.volume.w-1))),false);return true; }
+        if(!draggingScroll)return false;
+        int travel=layout.library.h-thumbHeight();
+        list.offset=travel<=0?0:(int)Math.round((y-layout.library.y-scrollGrab)*Math.max(0,rows().size()-visible())/travel);
+        list.clamp(visible());return true;
+    }
+    public void release(Canvas c) { if(draggingVolume)c.musicVolume(c.musicVolume(),true);draggingVolume=false;draggingScroll=false; }
+    public void scroll(int delta) { if(settingsOpen||editingNickname)return;clickedTrack=null;rows();list.scroll(delta,visible()); }
+    public void moveSelection(int delta) {
+        if(settingsOpen||editingNickname)return;
+        List<Track> tracks=rows();if(tracks.isEmpty())return;
+        int index=list.selected==null?-1:tracks.indexOf(list.selected);
+        index=Math.max(0,Math.min(tracks.size()-1,index+delta));list.selected=tracks.get(index);
+        if(index<list.offset)list.offset=index;
+        if(index>=list.offset+visible())list.offset=index-visible()+1;
+    }
+    public int nextFocus() {
+        for(int n=0;n<25;n++) { focusControl=(focusControl+1)%25;if(shown(focusControl)&&available(focusControl))return focusControl; }
+        return -1;
+    }
+    public void draw(Canvas c,int x,int y) { renderer.draw(this,c,x,y); }
+    public void overlay(Canvas c,int x,int y) { renderer.overlay(this,c,x,y); }
+    public void button(Canvas c,int id,boolean hover,boolean focus) { renderer.button(this,c,id,hover,focus); }
+    public Track playing() { return library.playback==null?null:library.playback.current(); }
+    public boolean paused() { return library.playback!=null&&library.playback.paused(); }
 }
